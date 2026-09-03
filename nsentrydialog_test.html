@@ -116,7 +116,7 @@
 			      { name: 'machineId', label: 'Machine', type: 'select', colspan: 2,
 				      options: (ctx) => (machinesForWorkCenter[ctx.getValue('workCenter')] || []) },
 
-			      { name: 'deps', label: 'Dependencies (task column + read-only cells)', type: 'table', colspan: 3, break: true, allowAdd: true, maxHeight: 200,
+			      { name: 'deps', label: 'Dependencies (task column + read-only cells)', type: 'table', colspan: 3, break: true, allowAdd: true,
 				      columns: [
 					      { name: 'id',    label: 'Task',  type: 'select', width: 150,
 						      options: [ { id: 'OP-10', text: '10 Op A' }, { id: 'OP-20', text: '20 Op B' },

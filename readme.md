@@ -51,7 +51,8 @@ opens the dialog, and logs the returned object on commit).
 
 Top-level layout properties: `title` (editor title bar text, omitted = blank),
 `buttons` (the dialog's action buttons - none are built in; see `### buttons`),
-plus the `columns` grid, the `view` read-only flag, and the `fields` array.
+plus the `columns` grid (defaults to `1` when omitted), the `view` read-only flag,
+and the `fields` array.
 
 ```js
 const formLayout = {

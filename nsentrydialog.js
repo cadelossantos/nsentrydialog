@@ -16,9 +16,26 @@ define([], function () {
 
   const EDITOR_COLUMN_WIDTH = 350;
 
+  const DEFAULT_GRID_COLUMNS = 1; // used when formLayout.columns is omitted
+
   const TABLE_COLUMN_MIN_WIDTH = 120; // floor for width-less table columns so they never crush
 
   let instanceCounter = 0;
+
+  // Vertical scrollbar width of the current environment (cached after first
+  // measure). Used to widen .nsd-editor-fields so its fixed-px grid always has
+  // the full columns*EDITOR_COLUMN_WIDTH available even when a scrollbar shows.
+  let _nsdScrollbarWidth = null;
+  function measureScrollbarWidth() {
+    if (_nsdScrollbarWidth != null) return _nsdScrollbarWidth;
+    if (typeof document === 'undefined' || !document.body) return (_nsdScrollbarWidth = 0);
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:50px;height:50px;overflow:scroll;visibility:hidden;';
+    document.body.appendChild(probe);
+    _nsdScrollbarWidth = probe.offsetWidth - probe.clientWidth;
+    document.body.removeChild(probe);
+    return _nsdScrollbarWidth;
+  }
 
   function safeLog(method, title, details) {
     try {
@@ -680,7 +697,18 @@ define([], function () {
 
     const fieldsContainer = this._$editor.find('.nsd-editor-fields');
     fieldsContainer.empty().css('display', 'flex').css('flex-wrap', 'wrap');
-    fieldsContainer.css('width', `${(formLayout.columns || 2) * EDITOR_COLUMN_WIDTH}px`);
+    // Reserve the scrollbar width symmetrically so the fixed-px grid keeps its
+    // full numCols*EDITOR_COLUMN_WIDTH content in every scroll state (never
+    // wraps) and stays visually centered. border-box keeps the content-box math
+    // correct even under an ambient global box-sizing reset.
+    const sb = measureScrollbarWidth();
+    const numCols = formLayout.columns || DEFAULT_GRID_COLUMNS;
+    fieldsContainer.css({
+      boxSizing: 'border-box',
+      width: `${numCols * EDITOR_COLUMN_WIDTH + 3 * sb}px`,
+      paddingLeft: `${sb}px`,
+      paddingRight: `${sb}px`,
+    });
 
     // Render the declared fields, then wire tag inputs (function-options fields
     // resolve once against the opened snapshot; later rebuilds are consumer-
@@ -763,7 +791,7 @@ define([], function () {
    */
   EntryDialog.prototype._renderFormFields = function ($container, formLayout, data) {
     const self = this;
-    const numColumns = formLayout.columns || 2;
+    const numColumns = formLayout.columns || DEFAULT_GRID_COLUMNS;
     const isView = formLayout.view === true;
     let fieldsConfig = Array.isArray(formLayout.fields) ? formLayout.fields : [];
 
