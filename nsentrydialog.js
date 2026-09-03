@@ -253,7 +253,7 @@ define([], function () {
 
     const self = this;
     this._$editor = this.$(
-      `<div class="nsd-editor" id="${this.id}-editor" style="display:none;">\t\t<div class="nsd-editor-header"><span class="nsd-editor-title"></span><button type="button" class="nsd-editor-close" title="Close" aria-label="Close">&#x2715;</button></div>\t\t<div class="nsd-editor-fields"></div>\t\t<div class="nsd-editor-actions">\t\t\t<button type="button" class="nsd-btn nsd-btn-primary nsd-btn-save">Save</button>\t\t\t<button type="button" class="nsd-btn nsd-btn-secondary nsd-btn-cancel">Cancel</button><button type="button" class="nsd-btn nsd-btn-secondary nsd-btn-close" style="display:none;">Close</button>\t\t</div>\t</div>`
+      `<div class="nsd-editor" id="${this.id}-editor" style="display:none;">\t\t<div class="nsd-editor-header"><span class="nsd-editor-title"></span><button type="button" class="nsd-editor-close" title="Close" aria-label="Close">&#x2715;</button></div>\t\t<div class="nsd-editor-fields"></div>\t\t<div class="nsd-editor-actions"></div>\t</div>`
     ).appendTo(this.$el);
 
     // Modal backdrop below the editor, above the chart (z-index 1999/2000)
@@ -280,26 +280,8 @@ define([], function () {
       }
     });
 
-    this._$editor.on('click', '.nsd-btn-save', function (e) {
-      e.stopPropagation();
-      self._saveEditor();
-    });
-
-    this._$editor.on('click', '.nsd-btn-cancel', function (e) {
-      e.stopPropagation();
-      // Explicit Cancel is a deliberate discard - never prompts
-      self.closeEditor();
-    });
-
-    this._$editor.on('click', '.nsd-btn-close', function (e) {
-      e.stopPropagation();
-      // View-only Close: nothing can be edited, so never prompt to discard
-      self.closeEditor();
-    });
-
     // Title-bar close (x): a dismiss affordance - prompts on unsaved changes
-    // like ESC/backdrop (Cancel stays the explicit no-prompt discard). The X
-    // reports a null result; ESC/backdrop keep reporting 2.
+    // like ESC/backdrop, and reports the same empty discard as the others.
     this._$editor.on('click', '.nsd-editor-close', function (e) {
       e.stopPropagation();
       self._requestClose(null);
@@ -669,17 +651,13 @@ define([], function () {
       if (data[f.name] !== undefined) this._editorValues[f.name] = data[f.name];
     }, this);
 
-    // Action buttons: custom buttons declared in create() replace the default
-    // Save/Cancel/Close set entirely. Otherwise keep the default behavior,
-    // where view-only layouts hide Save/Cancel and expose only Close.
+    // Action buttons: the caller declares the full set via create(); when none
+    // are supplied the actions bar stays empty and the dialog is exited only
+    // via header X / ESC / backdrop (all discarding).
     const self = this;
-    const isView = formLayout.view === true;
+    const $actions = this._$editor.find('.nsd-editor-actions');
+    $actions.find('.nsd-custom-btn').remove(); // clear stale buttons so reopens never duplicate
     if (Array.isArray(this._buttons) && this._buttons.length) {
-      // Hide the default buttons and render the caller-defined ones (clearing
-      // any previously-rendered custom buttons so reopens never duplicate).
-      this._$editor.find('.nsd-btn-save, .nsd-btn-cancel, .nsd-btn-close').hide();
-      const $actions = this._$editor.find('.nsd-editor-actions');
-      $actions.find('.nsd-custom-btn').remove();
       this._buttons.forEach(function (def) {
         const $b = self
           .$('<button type="button" class="nsd-btn nsd-custom-btn"></button>')
@@ -695,10 +673,6 @@ define([], function () {
         });
         $actions.append($b);
       });
-    } else {
-      this._$editor.find('.nsd-btn-save').css('display', isView ? 'none' : '');
-      this._$editor.find('.nsd-btn-cancel').css('display', isView ? 'none' : '');
-      this._$editor.find('.nsd-btn-close').css('display', isView ? '' : 'none');
     }
 
     const title = this._title == null ? '' : String(this._title);
@@ -733,21 +707,15 @@ define([], function () {
 
   /**
    * Close the modal editor, prompting to discard when there are unsaved
-   * changes. Explicit Cancel/Save bypass this (deliberate actions).
-   * When a `result` argument is given (the title-bar X), the close reports
-   * success(result, base); when omitted (backdrop / ESC) it reports 2 as
-   * before.
+   * changes. Every entry point (title-bar X, backdrop, ESC) reports an
+   * unwritten discard as success(null, {}).
    */
-  EntryDialog.prototype._requestClose = function (result) {
+  EntryDialog.prototype._requestClose = function () {
     if (this._editorDirty) {
       if (!window.confirm('Discard unsaved changes?')) return; // stay open
     }
-    if (arguments.length === 0) {
-      this.closeEditor();
-    } else {
-      this._pendingResult = [result, this._editorBaseData];
-      this.closeEditor();
-    }
+    this._pendingResult = [null, {}];
+    this.closeEditor();
   };
 
   /**
@@ -2678,9 +2646,8 @@ define([], function () {
   // ---- Modal-specific editor hooks ----
 
   // A custom-button click: the `result` value decides the action.
-  //   - With a defined `result` it funnels through the exact same validation + commit
-  //     pipeline as Save (reused _saveEditor), emitting success(result, mergedValueObj).
-  //     The only difference from Save is the result code.
+  //   - With a defined `result` it funnels through the validation + commit
+  //     pipeline (reused _saveEditor), emitting success(result, mergedValueObj).
   //   - With no `result` (undefined/null) it does NOT commit - it just closes,
   //     emitting success(null, {}) with an empty valueObj and no validation.
   EntryDialog.prototype._handleCustomAction = function (btnDef) {
@@ -2694,12 +2661,12 @@ define([], function () {
     }
   };
 
-  // _saveEditor (adapted) funnels the collected merged object here. It marks
-  // the pending result for the closeEditor wrapper, then closes; the wrapper
-  // delivers it as success(code, valueObj) and tears the modal down. The code
-  // is a custom button's `result` when this clicked one, otherwise 1 (Save).
+  // _saveEditor funnels the collected merged object here. It marks the pending
+  // result for the closeEditor wrapper, then closes; the wrapper delivers it as
+  // success(code, valueObj) and tears the modal down. The code is the custom
+  // button's `result` (set in _handleCustomAction before this runs).
   EntryDialog.prototype._resolveCommit = function (result) {
-    const code = this._saveEditorResult != null ? this._saveEditorResult : 1;
+    const code = this._saveEditorResult;
     this._saveEditorResult = null; // reset for next open/commit
     this._pendingResult = [code, result];
     this.closeEditor();
@@ -2962,7 +2929,8 @@ define([], function () {
    * @param {Object} formLayout  Field layout (title/buttons/columns/view/fields) - declared by the caller.
    *                             title sets the editor title bar (omitted = blank).
    *                             buttons is an array of { label, result?, primary?, color?, textColor? }
-   *                             descriptors that replace the Save/Cancel/Close buttons. A button
+   *                             descriptors; it is the ONLY source of action buttons (none are
+   *                             built in - omit it and the actions bar stays empty). A button
    *                             with a defined `result` commits (validate + merge) and emits
    *                             success(result, merged). A button with no `result` just closes
    *                             without committing, emitting success(null, {}).
@@ -2993,17 +2961,15 @@ define([], function () {
     };
 
     const host = new EntryDialog({}, $);
-    host._editorBaseData = baseData;
     host._emitResult = emit;
     host._title = layout.title;
     host._buttons =
       Array.isArray(layout.buttons) && layout.buttons.length ? layout.buttons : null;
 
-    // Discard paths (Cancel / Close / backdrop / ESC / X) all funnel through
-    // closeEditor; wrap it so a pending commit reports its stored result and
-    // value, an unwritten discard reports success(2, base), and every close
-    // tears the modal down once. The title-bar X sets a pending result of
-    // [null, base] so it reports null instead of 2.
+    // Discard / commit paths all funnel through closeEditor; wrap it so a
+    // pending result (a committed merge, or an unwritten discard) reports its
+    // stored code + value, a bare close reports an empty discard
+    // success(null, {}), and every close tears the modal down once.
     const protoClose = EntryDialog.prototype.closeEditor;
     host.closeEditor = function () {
       const pending = this._pendingResult;
@@ -3011,7 +2977,7 @@ define([], function () {
         this._pendingResult = null;
         this._emitResult(pending[0], pending[1]);
       } else {
-        this._emitResult(2, this._editorBaseData);
+        this._emitResult(null, {});
       }
       protoClose.call(this);
       this._teardown();

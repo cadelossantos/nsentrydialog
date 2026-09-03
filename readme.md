@@ -20,25 +20,22 @@ module can be exercised in a plain browser without NetSuite.
 ```js
 const formLayout = {
   title: 'Edit Task', // optional; editor title bar text (omitted = blank)
-  buttons: [          // optional; replaces Save/Cancel/Close
+  buttons: [          // optional; the ONLY action buttons (none are built in)
     { label: 'Save', result: 1, primary: true },   // result -> commits
     { label: 'Save Draft', result: 3 },
     { label: 'Cancel' },                            // no result -> close only
   ],
   columns: 3,        // grid columns
-  view: false,       // true = read-only (Close button only)
+  view: false,       // true = read-only fields (buttons still caller-declared)
   fields: [ /* Field[] */ ],
 };
 
 nsentrydialog.create(formLayout, data, {
   success: function (result, valueObj) {
     // result = a button's `result` when its click commits (defined result);
-    //          null when a no-result button just closes (valueObj = {}),
-    //          null when the title-bar X closes (valueObj = base data),
-    //          2 when closed without saving (Cancel / Close / backdrop / ESC)
-    // valueObj = the FULL merged data object on a commit,
-    //            an empty object {} on a no-result button close,
-    //            or the original (unchanged) data otherwise
+    //          null on every non-commit close - no-result button / X / backdrop / ESC
+    // valueObj = the FULL merged data object on a commit;
+    //            a literal empty object {} on every non-commit close
     console.log('Result:', result, valueObj);
   },
   failure: function (reason) { console.error(reason); },
@@ -46,22 +43,22 @@ nsentrydialog.create(formLayout, data, {
 ```
 
 A test page is provided at `nsentrydialog_test.html` (loads jQuery + the module,
-opens the dialog, and logs the returned object on Save).
+opens the dialog, and logs the returned object on commit).
 
 ---
 
 ## `formLayout`
 
 Top-level layout properties: `title` (editor title bar text, omitted = blank),
-`buttons` (custom action buttons replacing Save/Cancel/Close — see below), plus
-the `columns` grid, the `view` read-only flag, and the `fields` array.
+`buttons` (the dialog's action buttons - none are built in; see `### buttons`),
+plus the `columns` grid, the `view` read-only flag, and the `fields` array.
 
 ```js
 const formLayout = {
   title: 'Edit Task',   // optional; editor title bar text (omitted = blank)
-  buttons: [ ... ],     // optional; replaces Save/Cancel/Close (see `### buttons`)
+  buttons: [ ... ],     // optional; the only action buttons (see `### buttons`)
   columns: 3,           // grid columns
-  view: false,          // true = read-only (Close button only)
+  view: false,          // true = read-only fields (buttons still caller-declared)
   fields: [ /* Field[] */ ],
 };
 ```
@@ -139,7 +136,7 @@ const machinesForWorkCenter = {
 
 const formLayout = {
   columns: 2,
-  view: false, // true = read-only (Close button only)
+  view: false, // true = read-only fields (buttons still caller-declared)
   fields: [
     { name: 'name', label: 'Name', type: 'text', colspan: 2, required: true },
     { name: 'notes', label: 'Notes', type: 'textarea', colspan: 2, break: true },
@@ -200,7 +197,7 @@ const formLayout = {
 
 | Callback   | Signature                     | Notes |
 | ---------- | ----------------------------- | ----- |
-| `success`  | `success(result, valueObj)`   | `result = 1` on the default Save, or a custom button's `result` on its click -> `valueObj` = full merged object. `result = 2` on any close (Cancel / Close / backdrop / ESC) -> `valueObj` = the original base `data` (unchanged; edits not persisted). `result = null` on the title-bar **X** close -> `valueObj` = the original base `data`. |
+| `success`  | `success(result, valueObj)`   | `result` = the clicked commit button's `result` (a button with a defined `result`) -> `valueObj` = full merged object. `result = null` on every non-commit close (no-result button / title-bar **X** / backdrop / ESC) -> `valueObj` = a literal empty object `{}` (edits not persisted). |
 | `failure`  | `failure(reason)`             | Called on construction/render error. |
 
 > `title` and `buttons` are declared on `formLayout`, not on `callbacks`. See
@@ -208,7 +205,9 @@ const formLayout = {
 
 ### `buttons`
 
-Each descriptor replaces the **Save / Cancel / Close** buttons. The optional
+`buttons` is the **only** source of action buttons - no Save / Cancel / Close
+are built in. Omit it and the actions bar stays empty (the dialog is then
+exited only via X / backdrop / ESC, all of which discard). The optional
 `result` decides what a click does:
 
 - **`result` defined** -> commit button: validates (like Save) and merges the
@@ -237,16 +236,11 @@ style.
   are `''`.
 - Required fields, per-column `required`, `validate`, live per-cell `validate`,
   and `validateRow` gate saving (silent revert / alert). `required` is resolved
-  at runtime and respects `visible` / `readonly` — a **hidden** field never
+  at runtime and respects `visible` / `readonly` - a **hidden** field never
   gates save; a visible+required+empty field alerts.
 - Fields with `visible: false` render **hidden** and are revealed when `visible`
   turns true (e.g. by toggling a driver field).
-- Closing via Cancel / Close / backdrop / ESC fires
-  `success(2, valueObj)` where `valueObj` is the unchanged base `data` — edits
-  are not persisted. Closing via the title-bar **X** fires `success(null,
-  valueObj)` instead of `2` (after the discard prompt, if there are unsaved
-  changes). A custom **button with no `result`** also reports `success(null,
-  {})` — note its `valueObj` is an empty object, distinct from the X close's
-  base `data`, even though both report `result === null`. When
-  `formLayout.view` is true and no custom `buttons` are passed, only **Close**
-  is shown.
+- Every non-commit close - a button with no `result`, the title-bar **X**,
+  backdrop, or ESC - fires `success(null, {})` with a literal empty `valueObj`
+  (edits are not persisted). The X / backdrop / ESC prompt to discard first
+  when there are unsaved changes; a no-result button does not.
