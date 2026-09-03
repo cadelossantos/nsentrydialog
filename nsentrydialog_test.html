@@ -53,106 +53,6 @@
         return;
       }
 
-      const workCenters = ['WC-1', 'WC-2', 'WC-3'];
-	    const machinesForWorkCenter = {
-        'WC-1': [{ id: 'M-1', text: 'Machine 1' }, { id: 'M-2', text: 'Machine 2' }],
-        'WC-2': [{ id: 'M-3', text: 'Machine 3' }],
-        'WC-3': [{ id: 'M-4', text: 'Machine 4' }, { id: 'M-5', text: 'Machine 5' }, { id: 'M-6', text: 'Machine 6' }]
-      };
-
-	    const formLayout = {
-        columns: 3,
-        fields: [
-          { name: 'name', label: 'Name', type: 'text', colspan: 3, required: true,
-            defaultValue: (ctx) => ctx.getValue('name') || 'New Operation' },
-
-          { name: 'qtyInt', label: 'Qty (integer)', type: 'integer', colspan: 1,
-            validate: (value, ctx) => value === '' || Number(value) >= 0 },
-          { name: 'qtyDec', label: 'Qty (decimal)', type: 'decimal', colspan: 1 },
-          { name: 'unitCost', label: 'Unit Cost', type: 'currency', decimalPlaces: 2, colspan: 1,
-            validate: (value, ctx) => value == null || value === '' || Number(value) <= 200 },
-
-          { name: 'startTime', label: 'Start Time', type: 'time', use12HourFormat: true, colspan: 1, break: true },
-          { name: 'dueDate', label: 'Due Date', type: 'date', colspan: 1 },
-          { name: 'endAt', label: 'End At', type: 'datetime', colspan: 1 },
-
-          { name: 'locked', label: 'Locked', type: 'checkbox', checkboxLabel: 'Mark locked', colspan: 1, defaultValue: true },
-          { name: 'secretNote', label: 'Shown when locked', type: 'text', colspan: 2,
-            visible: (ctx) => ctx.getValue('locked') === true,
-            required: (ctx) => ctx.getValue('locked') === true },
-
-          { name: 'priority', label: 'Priority (hint + disabled)', type: 'select', colspan: 1,
-            options: [
-              { id: '1', text: '1-Critical' },
-              { id: '2', text: '2-High', hint: { text: 'Retained beyond 30 days', color: '#b45309', textcolor: '#ffffff' } },
-              { id: '3', text: '3-Medium', disabled: true },
-              { id: '4', text: '4-Low', textcolor: '#b91c1c' }
-            ],
-            onChange: (ctx) => { ctx.setValue('prioNote', 'priority is ' + ctx.getValue('priority')); } },
-          { name: 'prioNote', label: 'Prio Readback', type: 'text', colspan: 2 },
-
-          { name: 'operators', label: 'Operators (multi — placeholder)', type: 'multi-select', colspan: 2,
-            options: [ { id: 'op1', text: 'Operator 1' }, { id: 'op2', text: 'Operator 2' },
-                       { id: 'op3', text: 'Operator 3' } ] },
-          { name: 'bom', label: 'BOM Items (multi — hint)', type: 'multi-select', colspan: 1,
-            options: [ { id: 'raw', text: 'Raw', hint: { text: 'Stock-level check enabled' } },
-                       { id: 'sub', text: 'Subassembly' }, { id: 'fin', text: 'Finished' } ] },
-
-          { name: 'notes', label: 'Notes (textarea)', type: 'textarea', colspan: 3, break: true },
-
-          { name: 'licenses', label: 'Licenses (max 2)', type: 'checkbox-group', colspan: 3, max: 2,
-            options: [ { id: 'L1', text: 'License A' }, { id: 'L2', text: 'License B' }, { id: 'L3', text: 'License C' } ] },
-
-          { name: 'workCenter', label: 'Work Center', type: 'select', colspan: 1, break: true,
-            options: (ctx) => workCenters.map(function (w) { return { id: w, text: w }; }),
-            onChange: (ctx) => ctx.setValue('machineId', '') || ctx.reloadOptions('machineId') },
-          { name: 'machineId', label: 'Machine', type: 'select', colspan: 2,
-            options: (ctx) => (machinesForWorkCenter[ctx.getValue('workCenter')] || []) },
-
-          { name: 'deps', label: 'Dependencies (task column + read-only cells)', type: 'table', colspan: 3, break: true, allowAdd: true, maxHeight: 200,
-            columns: [
-              { name: 'id',    label: 'Task',  type: 'select', width: 150,
-                options: [ { id: 'OP-10', text: '10 Op A' }, { id: 'OP-20', text: '20 Op B' },
-                           { id: 'OP-30', text: '30 Op C' }, { id: 'OP-90', text: '90 Op D' } ] },
-              { name: 'type',  label: 'Type',  type: 'select', width: 140, required: true, defaultValue: 'FS',
-                options: [ { id: 'SS', text: 'Start-to-Start' }, { id: 'FS', text: 'Finish-to-Start' } ] },
-              { name: 'qty',   label: 'Qty',   type: 'integer', width: 80 },
-              { name: 'cost',  label: 'Cost',  type: 'currency', decimalPlaces: 2, width: 100,
-                validate: (value, ctx) => value == null || value === '' || Number(value) <= 200 },
-              { name: 'due',   label: 'Due',   type: 'date', width: 140 },
-              { name: 'start', label: 'Start', type: 'time', width: 110 },
-              { name: 'note',  label: 'Note',  type: 'textarea' }
-            ],
-            rowInit: (ctx) => ({ qty: 1 }),
-            validateRow: (value, ctx) => { const q = value ? value.qty : null; return q == null || Number(q) >= 1; } },
-
-          { name: 'flags', label: 'Flags (allowAdd:false — empty state)', type: 'table', colspan: 3, break: true, allowAdd: false,
-            columns: [ { name: 'code', label: 'Code', type: 'text' },
-                       { name: 'active', label: 'Active', type: 'checkbox' } ] }
-        ]
-      };
-
-	    const data = {
-        name: 'Operation 100',
-        qtyInt: 5,
-        qtyDec: 1.5,
-        unitCost: 50,
-        startTime: '14:30',
-        dueDate: '2026-08-15',
-        endAt: '2026-08-15T16:00',
-        locked: false,
-        priority: '2',
-        operators: ['op1', 'op2'],
-        bom: ['raw'],
-        notes: 'First line\nSecond line — this is a multi-line note.',
-        licenses: [],
-        workCenter: 'WC-1',
-        machineId: 'M-1',
-        deps: [
-          { id: 'OP-90', type: 'FS', qty: 2, cost: 10, due: '2026-08-10', start: '08:00', note: 'initial row' }
-        ],
-        flags: []
-      };
 
       const statusEl = document.getElementById('status');
 
@@ -163,20 +63,124 @@
       }
 
       function open(view) {
+
+	      const workCenters = ['WC-1', 'WC-2', 'WC-3'];
+	      const machinesForWorkCenter = {
+		      'WC-1': [{ id: 'M-1', text: 'Machine 1' }, { id: 'M-2', text: 'Machine 2' }],
+		      'WC-2': [{ id: 'M-3', text: 'Machine 3' }],
+		      'WC-3': [{ id: 'M-4', text: 'Machine 4' }, { id: 'M-5', text: 'Machine 5' }, { id: 'M-6', text: 'Machine 6' }]
+	      };
+
+	      const formLayout = {
+		      columns: 3,
+		      view: view,
+		      title: view ? 'Test Editor — View' : 'Test Editor',
+		      fields: [
+			      { name: 'name', label: 'Name', type: 'text', colspan: 3, required: true,
+				      defaultValue: (ctx) => ctx.getValue('name') || 'New Operation' },
+
+			      { name: 'qtyInt', label: 'Qty (integer)', type: 'integer', colspan: 1,
+				      validate: (value, ctx) => value === '' || Number(value) >= 0 },
+			      { name: 'qtyDec', label: 'Qty (decimal)', type: 'decimal', colspan: 1 },
+			      { name: 'unitCost', label: 'Unit Cost', type: 'currency', decimalPlaces: 2, colspan: 1,
+				      validate: (value, ctx) => value == null || value === '' || Number(value) <= 200 },
+
+			      { name: 'startTime', label: 'Start Time', type: 'time', use12HourFormat: true, colspan: 1, break: true },
+			      { name: 'dueDate', label: 'Due Date', type: 'date', colspan: 1 },
+			      { name: 'endAt', label: 'End At', type: 'datetime', colspan: 1 },
+
+			      { name: 'locked', label: 'Locked', type: 'checkbox', checkboxLabel: 'Mark locked', colspan: 1, defaultValue: true },
+			      { name: 'secretNote', label: 'Shown when locked', type: 'text', colspan: 2,
+				      visible: (ctx) => ctx.getValue('locked') === true,
+				      required: (ctx) => ctx.getValue('locked') === true },
+
+			      { name: 'priority', label: 'Priority (hint + disabled)', type: 'select', colspan: 1,
+				      options: [
+					      { id: '1', text: '1-Critical' },
+					      { id: '2', text: '2-High', hint: { text: 'Retained beyond 30 days', color: '#b45309', textcolor: '#ffffff' } },
+					      { id: '3', text: '3-Medium', disabled: true },
+					      { id: '4', text: '4-Low', textcolor: '#b91c1c' }
+				      ],
+				      onChange: (ctx) => { ctx.setValue('prioNote', 'priority is ' + ctx.getValue('priority')); } },
+			      { name: 'prioNote', label: 'Prio Readback', type: 'text', colspan: 2 },
+
+			      { name: 'operators', label: 'Operators (multi — placeholder)', type: 'multi-select', colspan: 2,
+				      options: [ { id: 'op1', text: 'Operator 1' }, { id: 'op2', text: 'Operator 2' },
+					      { id: 'op3', text: 'Operator 3' } ] },
+			      { name: 'bom', label: 'BOM Items (multi — hint)', type: 'multi-select', colspan: 1,
+				      options: [ { id: 'raw', text: 'Raw', hint: { text: 'Stock-level check enabled' } },
+					      { id: 'sub', text: 'Subassembly' }, { id: 'fin', text: 'Finished' } ] },
+
+			      { name: 'notes', label: 'Notes (textarea)', type: 'textarea', colspan: 3, break: true },
+
+			      { name: 'licenses', label: 'Licenses (max 2)', type: 'checkbox-group', colspan: 3, max: 2,
+				      // defaultValue: ['L1', 'L3'],   // sample default: pre-checks L1 + L3 (a data value for this field would win)
+				      options: [ { id: 'L1', text: 'License A' }, { id: 'L2', text: 'License B' }, { id: 'L3', text: 'License C' } ] },
+
+			      { name: 'workCenter', label: 'Work Center', type: 'select', colspan: 1, break: true,
+				      options: (ctx) => workCenters.map(function (w) { return { id: w, text: w }; }),
+				      onChange: (ctx) => ctx.setValue('machineId', '') || ctx.reloadOptions('machineId') },
+			      { name: 'machineId', label: 'Machine', type: 'select', colspan: 2,
+				      options: (ctx) => (machinesForWorkCenter[ctx.getValue('workCenter')] || []) },
+
+			      { name: 'deps', label: 'Dependencies (task column + read-only cells)', type: 'table', colspan: 3, break: true, allowAdd: true, maxHeight: 200,
+				      columns: [
+					      { name: 'id',    label: 'Task',  type: 'select', width: 150,
+						      options: [ { id: 'OP-10', text: '10 Op A' }, { id: 'OP-20', text: '20 Op B' },
+							      { id: 'OP-30', text: '30 Op C' }, { id: 'OP-90', text: '90 Op D' } ] },
+					      { name: 'type',  label: 'Type',  type: 'select', width: 140, required: true, defaultValue: 'FS',
+						      options: [ { id: 'SS', text: 'Start-to-Start' }, { id: 'FS', text: 'Finish-to-Start' } ] },
+					      { name: 'qty',   label: 'Qty',   type: 'integer', width: 80 },
+					      { name: 'cost',  label: 'Cost',  type: 'currency', decimalPlaces: 2, width: 100,
+						      validate: (value, ctx) => value == null || value === '' || Number(value) <= 200 },
+					      { name: 'due',   label: 'Due',   type: 'date', width: 140 },
+					      { name: 'start', label: 'Start', type: 'time', width: 110 },
+					      { name: 'note',  label: 'Note',  type: 'textarea' }
+				      ],
+				      rowInit: (ctx) => ({ qty: 1 }),
+				      validateRow: (value, ctx) => { const q = value ? value.qty : null; return q == null || Number(q) >= 1; } },
+
+			      { name: 'flags', label: 'Flags (allowAdd:false — empty state)', type: 'table', colspan: 3, break: true, allowAdd: false,
+				      columns: [ { name: 'code', label: 'Code', type: 'text' },
+					      { name: 'active', label: 'Active', type: 'checkbox' } ] }
+		      ],
+		      buttons: [
+			      { label: 'OK (Save)', result: 1, primary: true },
+			      { label: 'Audit', result: 3, color: '#f59e0b', textColor: '#ffffff' },
+			      { label: 'Cancel' }
+		      ],
+	      };
+
+	      const data = {
+		      name: 'Operation 100',
+		      qtyInt: 5,
+		      qtyDec: 1.5,
+		      unitCost: 50,
+		      startTime: '14:30',
+		      dueDate: '2026-08-15',
+		      endAt: '2026-08-15T16:00',
+		      locked: true,
+		      priority: '2',
+		      operators: ['op1', 'op2'],
+		      bom: ['raw'],
+		      notes: 'First line\nSecond line — this is a multi-line note.',
+          licenses: ['L1', 'L3'],
+		      workCenter: 'WC-1',
+		      machineId: 'M-1',
+		      deps: [
+			      { id: 'OP-90', type: 'FS', qty: 2, cost: 10, due: '2026-08-10', start: '08:00', note: 'initial row' }
+		      ],
+		      flags: []
+	      };
+
         try {
           nsd.create(
-            view ? Object.assign({}, formLayout, { view: true }) : formLayout,
+	          formLayout,
             data,
             {
-              title: view ? 'Test Editor — View' : 'Test Editor',
-              buttons: [
-                { label: 'OK (Save)', value: 1, primary: true },
-                { label: 'Audit', value: 3, color: '#f59e0b', textcolor: '#ffffff' },
-                { label: 'Cancel', value: 2, primary: false }
-              ],
               success: function (result, valueObj) {
-                if (result === 1) logLine('[SAVE] result=' + result + ' valueObj =', valueObj);
-                else logLine('[CLOSED] result=' + result + ' valueObj =', valueObj);
+                if (result === null) logLine('[NO-SAVE CLOSE] result=' + result + ' valueObj =', valueObj);
+                else logLine('[SAVE] result=' + result + ' valueObj =', valueObj);
               },
               failure: function (reason) {
                 console.error('nsentrydialog failure:', reason);

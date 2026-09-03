@@ -18,11 +18,27 @@ module can be exercised in a plain browser without NetSuite.
 ## Usage
 
 ```js
+const formLayout = {
+  title: 'Edit Task', // optional; editor title bar text (omitted = blank)
+  buttons: [          // optional; replaces Save/Cancel/Close
+    { label: 'Save', result: 1, primary: true },   // result -> commits
+    { label: 'Save Draft', result: 3 },
+    { label: 'Cancel' },                            // no result -> close only
+  ],
+  columns: 3,        // grid columns
+  view: false,       // true = read-only (Close button only)
+  fields: [ /* Field[] */ ],
+};
+
 nsentrydialog.create(formLayout, data, {
   success: function (result, valueObj) {
-    // result = 1 on Save; 2 when closed without saving
-    // valueObj = the FULL merged data object on Save,
-    //            or the original (unchanged) data when closed
+    // result = a button's `result` when its click commits (defined result);
+    //          null when a no-result button just closes (valueObj = {}),
+    //          null when the title-bar X closes (valueObj = base data),
+    //          2 when closed without saving (Cancel / Close / backdrop / ESC)
+    // valueObj = the FULL merged data object on a commit,
+    //            an empty object {} on a no-result button close,
+    //            or the original (unchanged) data otherwise
     console.log('Result:', result, valueObj);
   },
   failure: function (reason) { console.error(reason); },
@@ -36,10 +52,16 @@ opens the dialog, and logs the returned object on Save).
 
 ## `formLayout`
 
+Top-level layout properties: `title` (editor title bar text, omitted = blank),
+`buttons` (custom action buttons replacing Save/Cancel/Close — see below), plus
+the `columns` grid, the `view` read-only flag, and the `fields` array.
+
 ```js
 const formLayout = {
-  columns: 3,        // grid columns
-  view: false,       // true = read-only (Close button only)
+  title: 'Edit Task',   // optional; editor title bar text (omitted = blank)
+  buttons: [ ... ],     // optional; replaces Save/Cancel/Close (see `### buttons`)
+  columns: 3,           // grid columns
+  view: false,          // true = read-only (Close button only)
   fields: [ /* Field[] */ ],
 };
 ```
@@ -178,12 +200,34 @@ const formLayout = {
 
 | Callback   | Signature                     | Notes |
 | ---------- | ----------------------------- | ----- |
-| `success`  | `success(result, valueObj)`   | `result = 1` on Save -> `valueObj` = full merged object. `result = 2` on any close (Cancel / Close / backdrop / X / ESC) -> `valueObj` = the original base `data` (unchanged; edits not persisted). |
+| `success`  | `success(result, valueObj)`   | `result = 1` on the default Save, or a custom button's `result` on its click -> `valueObj` = full merged object. `result = 2` on any close (Cancel / Close / backdrop / ESC) -> `valueObj` = the original base `data` (unchanged; edits not persisted). `result = null` on the title-bar **X** close -> `valueObj` = the original base `data`. |
 | `failure`  | `failure(reason)`             | Called on construction/render error. |
 
-`title`, `message`, and custom `buttons` are **not** part of the API — the
-dialog has its own title bar (shows `data.name`) and its own **Save / Cancel /
-Close** buttons. When `formLayout.view` is true, only **Close** is shown.
+> `title` and `buttons` are declared on `formLayout`, not on `callbacks`. See
+> the `formLayout` section above; the `buttons` descriptor is documented below.
+
+### `buttons`
+
+Each descriptor replaces the **Save / Cancel / Close** buttons. The optional
+`result` decides what a click does:
+
+- **`result` defined** -> commit button: validates (like Save) and merges the
+  editor into `valueObj`, then emits `success(result, fullMergedValue)`.
+- **`result` omitted / `null`** -> close-only button: does **not** commit and
+  does **not** validate; it just closes, emitting `success(null, {})` with a
+  literal empty `valueObj`.
+
+| Prop          | Type    | Notes |
+| ------------- | ------- | ----- |
+| `label`       | `string` | Button text. |
+| `result`      | `number` | Code passed to `success(result, valueObj)` on a commit. Omitted / `null` -> the button becomes a close-only action (`success(null, {})`). `0` is a valid commit result. |
+| `primary`     | `boolean` | `true` -> primary button styling; otherwise secondary. |
+| `color`       | `string` | Optional special-case background color override. |
+| `textColor`   | `string` | Optional special-case text color override. |
+
+`color` / `textColor` are layered on top of the `primary`/`secondary` class,
+so a plain button (neither special-case) keeps the standard primary/secondary
+style.
 
 ## Behavior notes
 
@@ -197,6 +241,12 @@ Close** buttons. When `formLayout.view` is true, only **Close** is shown.
   gates save; a visible+required+empty field alerts.
 - Fields with `visible: false` render **hidden** and are revealed when `visible`
   turns true (e.g. by toggling a driver field).
-- Closing via Cancel / Close / backdrop / X / ESC fires
+- Closing via Cancel / Close / backdrop / ESC fires
   `success(2, valueObj)` where `valueObj` is the unchanged base `data` — edits
-  are not persisted.
+  are not persisted. Closing via the title-bar **X** fires `success(null,
+  valueObj)` instead of `2` (after the discard prompt, if there are unsaved
+  changes). A custom **button with no `result`** also reports `success(null,
+  {})` — note its `valueObj` is an empty object, distinct from the X close's
+  base `data`, even though both report `result === null`. When
+  `formLayout.view` is true and no custom `buttons` are passed, only **Close**
+  is shown.
