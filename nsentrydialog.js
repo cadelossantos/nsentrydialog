@@ -2291,6 +2291,14 @@ define([], function () {
       rows.push(entry);
     });
     let rowsHtml = '';
+    // Restore the table empty-state when empty and non-addable/readonly (so a
+    // reload that empties the table keeps the "No records available." placeholder).
+    const isTableReadonly =
+      (field && this._resolveProp(field.readonly, this._buildCtx()) === true) ||
+      (this._activeFormLayout && this._activeFormLayout.view === true);
+    if (rows.length === 0 && (isTableReadonly || field.allowAdd === false)) {
+      rowsHtml += '<div class="nsd-table-empty">No records available.</div>';
+    }
     rows.forEach(function (entry) {
       rowsHtml += self._buildTableRowHtml(cols, entry || {}, field, false);
     });

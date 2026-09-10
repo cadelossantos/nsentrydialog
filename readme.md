@@ -103,6 +103,9 @@ or a **`(ctx) => value`** resolver.
 > and switches the hour to a 12-hour clock; avoid literal lowercase `a` characters
 > unless that is intended. `ctx.values` is a read-only snapshot - use `getValue` /
 > `setValue` to read and write.
+>
+> `MM`, `DD`, and the 12-hour `hh` are **not** zero-padded (e.g. `8/10/2026`,
+> `4:30 pm`); `YY` and `mm` are zero-padded; `MMM` is the localized short month.
 
 ### `ctx`
 

@@ -67,6 +67,7 @@
 		      'A': [{ id: 'A1', text: 'A-1 Dock' }, { id: 'A2', text: 'A-2 Yard' }],
 		      'B': [{ id: 'B1', text: 'B-1 Dock' }, { id: 'B2', text: 'B-2 Yard' }, { id: 'B3', text: 'B-3 Depot' }]
 	      };
+	      const assetPool = [{ id: 'NG-1', text: 'NG-1' }, { id: 'NG-2', text: 'NG-2' }, { id: 'NG-3', text: 'NG-3' }];
 
 	      const formLayout = {
 		      columns: 3,
@@ -116,7 +117,7 @@
 
 			      { name: 'workCenter', label: 'Work Center', type: 'select', colspan: 1, break: true,
 				      options: (ctx) => workCenters.map(function (w) { return { id: w, text: w }; }),
-				      onChange: (ctx) => ctx.setValue('machineId', '') || ctx.reloadOptions('machineId') },
+				      onChange: (ctx) => { ctx.setValue('machineId', ''); ctx.reloadOptions('machineId'); } },
 			      { name: 'machineId', label: 'Machine', type: 'select', colspan: 2,
 				      options: (ctx) => (machinesForWorkCenter[ctx.getValue('workCenter')] || []) },
 
@@ -130,6 +131,17 @@
 				      columns: [
 					      { name: 'loc', label: 'Location', type: 'select', width: 160, required: true,
 						      options: (ctx) => locsByRoute[ctx.getValue('route')] || [] },
+					      { name: 'qty', label: 'Qty', type: 'integer', width: 80, defaultValue: 1 }
+				      ],
+				      rowInit: () => ({ qty: 1 }) },
+
+			      { name: 'display', label: 'Asset Log (reload empties below)', type: 'select', colspan: 3, break: true,
+				      options: [ { id: 'Details', text: 'Details' }, { id: 'Minimal', text: 'Minimal' } ],
+				      onChange: (ctx) => { ctx.setValue('assetLog', ctx.getValue('display') === 'Details' ? [{ assetCode: 'NG-1', qty: 1 }] : []); ctx.reloadOptions('assetCode'); } },
+			      { name: 'assetLog', label: 'Asset Log (allowAdd:false — empty state on reload)', type: 'table', colspan: 3, break: true, allowAdd: false,
+				      columns: [
+					      { name: 'assetCode', label: 'Asset', type: 'select', width: 120, required: true,
+						      options: (ctx) => assetPool },
 					      { name: 'qty', label: 'Qty', type: 'integer', width: 80, defaultValue: 1 }
 				      ],
 				      rowInit: () => ({ qty: 1 }) },
@@ -180,6 +192,8 @@
 		      machineId: 'M-1',
 		      route: 'A',
 		      lots: [],
+		      display: 'Details',
+		      assetLog: [ { assetCode: 'NG-1', qty: 1 } ],
 		      deps: [
 			      { id: 'OP-90', type: 'FS', qty: 2, cost: 10, due: '2026-08-10', start: '08:00', note: 'initial row' }
 		      ],
