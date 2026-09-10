@@ -88,7 +88,7 @@ or a **`(ctx) => value`** resolver.
 | `checkboxLabel` | `string` | `checkbox` display text beside the box. |
 | `max` | `number` | `checkbox-group` max selectable boxes (over-selection snaps back). |
 | `summary` | `string \| (ctx) => string \| [{text, textcolor?, hint?:{color?,textcolor?}}]` | Warning lines (`⚠` first line, all lines in a styled hover tooltip). |
-| `use12HourFormat` | `boolean \| (ctx) => boolean` | `time` display (12h vs 24h). |
+| `format` | `string` | `date`/`datetime`/`time` **read-only display** (and the editable `time` input). Case-sensitive tokens: date `YYYY`, `YY`, `MM`, `DD`, `MMM`; time `hh`, `mm`, `a`. A standalone `a` switches the hour to a 12-hour clock with a lowercase `am`/`pm` marker; without it the hour renders 24-hour. Omitted => `MM/DD/YYYY` (date), `MM/DD/YYYY hh:mm a` (datetime), `hh:mm a` (time). |
 | `decimalPlaces` | `number` | Currency rounding (default 2, clamp [2,10]). |
 | `rowInit` | `(ctx) => object` | Table: seed a newly added row. |
 | `validateRow` | `(value, ctx) => boolean` | Table: whole live row; `false` => silent block. |
@@ -96,6 +96,13 @@ or a **`(ctx) => value`** resolver.
 
 > Table option dropdowns use `type: 'select'` with `options`; there is no
 > separate `task` column type.
+
+> `format` tokens are case-sensitive (dates uppercase `YYYY`/`YY`/`MM`/`DD`/`MMM`;
+> time lowercase `hh`/`mm`/`a`) and matched as whole words. The `a` token must be
+> standalone - any bare lowercase `a` in the format is treated as the AM/PM marker
+> and switches the hour to a 12-hour clock; avoid literal lowercase `a` characters
+> unless that is intended. `ctx.values` is a read-only snapshot - use `getValue` /
+> `setValue` to read and write.
 
 ### `ctx`
 
@@ -115,7 +122,7 @@ Reads via `getValue` / `getTableValue` are the working values; writes only via
 ### `type` → returned value
 
 - `decimal` / `integer` / `currency` → `Number` (currency rounded to `decimalPlaces`).
-- `time` → canonical 24h zero-padded `HH:MM` string.
+- `time` → canonical 24h zero-padded `HH:MM` string (stored value is always 24h; the `format` option affects only the read-only/input display).
 - `date` / `datetime` → `Date` (table rows serialize to ISO in row JSON).
 - `checkbox` → boolean; `multi-select` / `checkbox-group` → `string[]`.
 - `select` → string (a searchable single-select drawn from `options`);
@@ -148,7 +155,7 @@ const formLayout = {
       validate: (value) => value == null || value === '' || Number(value) <= 200 },
     { name: 'factor', label: 'Factor', type: 'decimal', colspan: 1, break: true },
 
-    { name: 'startTime', label: 'Start Time', type: 'time', use12HourFormat: true, colspan: 1 },
+    { name: 'startTime', label: 'Start Time', type: 'time', format: 'hh:mm a', colspan: 1 },
     { name: 'dueDate', label: 'Due Date', type: 'date', colspan: 1 },
     { name: 'endAt', label: 'End At', type: 'datetime', colspan: 1, break: true },
 

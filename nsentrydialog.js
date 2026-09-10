@@ -267,6 +267,7 @@ define([], function () {
     this._activeFormLayout = null;
     this._editorDirty = false;
     this._editorValues = {};
+    this._snapshotCache = null;
     this._fieldChangeVisited = null;
     this._saving = false;
 
@@ -679,7 +680,10 @@ define([], function () {
     // formLayout is required - no built-in field maps (the editor structure is
     // declared by the caller at the call site). fields may be an array or a
     // function of the data (resolved below).
-    if (!formLayout || (typeof formLayout.fields !== 'function' && !Array.isArray(formLayout.fields))) return;
+    if (!formLayout) throw new Error(`${MODULE_NAME}: formLayout is required`);
+    if (typeof formLayout.fields !== 'function' && !Array.isArray(formLayout.fields)) {
+      throw new Error(`${MODULE_NAME}: formLayout.fields must be an array or a function`);
+    }
     // Disable the editor entirely while a save is in progress.
     if (this._saving) return;
 
@@ -694,6 +698,7 @@ define([], function () {
     // onChange consumers (merged over the base data in _editorSnapshot).
     // Seeded from the data so the first render and the first edit agree.
     this._editorValues = {};
+    this._snapshotCache = null;
     this._fieldChangeVisited = null;
     const seedFields = Array.isArray(formLayout.fields) ? formLayout.fields : [];
     seedFields.forEach(function (f) {
@@ -763,6 +768,7 @@ define([], function () {
     this._activeFormLayout = null;
     this._editorDirty = false;
     this._editorValues = {};
+    this._snapshotCache = null;
     this._fieldChangeVisited = null;
   };
 
@@ -923,7 +929,7 @@ define([], function () {
           for (let mi = 0; mi < mOpts.length; mi++) {
             const normalized = this._normalizeOption(mOpts[mi]);
             if (valArr.indexOf(normalized.val) !== -1) {
-              fieldHtml += `<span class="nsd-tag-chip" data-val="${escapeHtml(normalized.val)}"><span class="nsd-tag-chip-text">${escapeHtml(normalized.text)}</span><span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span></span>`;
+              fieldHtml += `<span class="nsd-tag-chip" data-val="${escapeHtml(normalized.val)}"><span class="nsd-tag-chip-text">${escapeHtml(normalized.text)}</span><span class="nsd-tag-chip-remove" role="button" tabindex="0" title="Remove" aria-label="Remove">${CLOSE_ICO_SVG}</span></span>`;
             }
           }
           fieldHtml += `
@@ -954,11 +960,10 @@ define([], function () {
         }
       } else if (field.type === 'time') {
         const displayTime = this._formatTime(value, field);
-        const use12 = this._is12HourFormat(field);
         if (isReadonly) {
           fieldHtml += `<span class="nsd-field-readonly nsd-select-label" data-field-name="${escapeHtml(fieldName)}">${displayTime !== '' ? escapeHtml(displayTime) : '&nbsp;'}</span>`;
         } else {
-          fieldHtml += `<input type="text" class="nsd-editor-field nsd-time-field" data-field-name="${escapeHtml(fieldName)}" data-use12="${use12 ? 'true' : 'false'}"${field.maxlength != null ? ` maxlength="${escapeHtml(String(field.maxlength))}"` : ''} value="${escapeHtml(displayTime)}" style="width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;box-sizing:border-box;">`;
+          fieldHtml += `<input type="text" class="nsd-editor-field nsd-time-field" data-field-name="${escapeHtml(fieldName)}" data-field-type="${escapeHtml(field.type)}"${field.maxlength != null ? ` maxlength="${escapeHtml(String(field.maxlength))}"` : ''} value="${escapeHtml(displayTime)}" style="width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;box-sizing:border-box;">`;
         }
       } else if (field.type === 'date' || field.type === 'datetime') {
         const isDateTime = field.type !== 'date';
@@ -967,7 +972,7 @@ define([], function () {
         const inputVal = validDate ? (isDateTime ? this._toDatetimeLocal(dateVal) : toLocalDateStr(dateVal)) : '';
         if (isReadonly) {
           // Read-only date/datetime: readable static text, &nbsp; keeps the footprint
-          const displayDate = validDate ? this.formatDate(dateVal, { showYear: true, showTime: isDateTime }) : '';
+          const displayDate = validDate ? this.formatDate(dateVal, field.format, { showTime: isDateTime }) : '';
           fieldHtml += `<span class="nsd-field-readonly nsd-select-label" data-field-name="${escapeHtml(fieldName)}">${displayDate !== '' ? escapeHtml(displayDate) : '&nbsp;'}</span>`;
         } else {
           fieldHtml += `<div class="nsd-date-wrapper"><input type="${isDateTime ? 'datetime-local' : 'date'}" class="nsd-editor-field" data-field-name="${escapeHtml(fieldName)}" data-field-type="${escapeHtml(field.type)}" value="${escapeHtml(inputVal)}" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;box-sizing:border-box;">${this._dateIconSvg()}</div>`;
@@ -1091,20 +1096,27 @@ define([], function () {
    * hold the first line's hint colors for the tooltip. Returns '' when the hook
    * is absent, throws, or returns no lines.
    */
-  EntryDialog.prototype._renderSummaryHtml = function (field) {
-    if (!field || field.summary == null) return '';
-    const ctx = this._buildCtx();
+  /**
+   * Resolve a field's `summary` hook into a normalized array of warning lines
+   * ({ text, textcolor?, hint?: { color?, textcolor? } }) using the supplied
+   * ctx. A string summary becomes a single line; an empty / non-array result
+   * returns null. Shared by the render and refresh paths.
+   */
+  EntryDialog.prototype._resolveSummaryLines = function (field, ctx) {
+    if (!field || field.summary == null) return null;
     const resolved = this._resolveProp(field.summary, ctx);
-    if (!resolved) return '';
     let lines = null;
-    if (typeof resolved === 'string') {
-      lines = [{ text: resolved }];
-    } else if (Array.isArray(resolved)) {
-      lines = resolved;
-    } else {
-      return '';
-    }
-    if (!Array.isArray(lines) || lines.length === 0) return '';
+    if (typeof resolved === 'string') lines = [{ text: resolved }];
+    else if (Array.isArray(resolved)) lines = resolved;
+    else lines = null;
+    if (!Array.isArray(lines) || lines.length === 0) return null;
+    return lines;
+  };
+
+  EntryDialog.prototype._renderSummaryHtml = function (field) {
+    if (!field) return '';
+    const lines = this._resolveSummaryLines(field, this._buildCtx());
+    if (!lines) return '';
     const text = lines[0] && lines[0].text != null ? String(lines[0].text) : '';
     if (!text) return '';
     const color = sanitizeColor((lines[0] && lines[0].textcolor) || '');
@@ -1137,13 +1149,8 @@ define([], function () {
         $el.remove();
         return;
       }
-      const ctx = self._buildCtx({ name: fieldName, value: value });
-      const resolved = self._resolveProp(field.summary, ctx);
-      let lines = null;
-      if (typeof resolved === 'string') lines = [{ text: resolved }];
-      else if (Array.isArray(resolved)) lines = resolved;
-      else lines = null;
-      if (!Array.isArray(lines) || lines.length === 0) {
+      const lines = self._resolveSummaryLines(field, self._buildCtx({ name: fieldName, value: value }));
+      if (!lines) {
         $el.remove();
         return;
       }
@@ -1453,7 +1460,7 @@ define([], function () {
       const validDate = dateVal && !isNaN(dateVal.getTime()) ? dateVal : null;
       const inpVal = validDate ? (isDateTime ? this._toDatetimeLocal(validDate) : toLocalDateStr(validDate)) : '';
       if (colReadonly) {
-        const dispDate = validDate ? this.formatDate(validDate, { showYear: true, showTime: isDateTime }) : '';
+        const dispDate = validDate ? this.formatDate(validDate, col.format, { showTime: isDateTime }) : '';
         return `<span class="nsd-table-static" data-col-key="${escapeHtml(col.key)}" data-val="${escapeHtml(String(cellValue == null ? '' : cellValue))}">${dispDate !== '' && dispDate != null ? escapeHtml(dispDate) : '&nbsp;'}</span>`;
       }
       return `<div class="nsd-date-wrapper"><input type="${isDateTime ? 'datetime-local' : 'date'}" class="nsd-editor-field" data-col-key="${escapeHtml(col.key)}" value="${escapeHtml(inpVal)}" style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;box-sizing:border-box;">${this._dateIconSvg()}</div>`;
@@ -1462,11 +1469,10 @@ define([], function () {
     // time
     if (colType === 'time') {
       const displayTime = this._formatTime(cellValue, col);
-      const use12 = this._is12HourFormat(col);
       if (colReadonly) {
         return `<span class="nsd-table-static" data-col-key="${escapeHtml(col.key)}" data-val="${escapeHtml(valStr)}">${displayTime !== '' && displayTime != null ? escapeHtml(displayTime) : '&nbsp;'}</span>`;
       }
-      return `<input type="text" class="nsd-editor-field nsd-time-field" data-col-key="${escapeHtml(col.key)}" data-use12="${use12 ? 'true' : 'false'}" value="${escapeHtml(displayTime)}" style="width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;box-sizing:border-box;">`;
+      return `<input type="text" class="nsd-editor-field nsd-time-field" data-col-key="${escapeHtml(col.key)}" value="${escapeHtml(displayTime)}" style="width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;box-sizing:border-box;">`;
     }
 
     // textarea (multi-line)
@@ -1559,7 +1565,7 @@ define([], function () {
    * auto-commit). Returns 'invalid' (alert shown, row stays active), 'empty'
    * (no values - nothing committed), or 'committed'.
    */
-  EntryDialog.prototype._commitTableRow = function ($row) {
+  EntryDialog.prototype._commitTableRow = function ($row, opts) {
     const cfg = this._getTableConfig($row);
     const read = this._readTableRowInputs($row, cfg.columns);
     const prevEntry = this._readTableRowValue($row);
@@ -1643,8 +1649,11 @@ define([], function () {
         safeLog('error', `${MODULE_NAME}:onChange`, (e && e.message) || e);
       }
     }
-    // Generic table-field change dispatch (committed row value).
-    if ($field.length) this._dispatchTableFieldChange($field.data('field-name'));
+    // Generic table-field change dispatch (committed row value); the reload
+    // path passes { noDispatch: true } and dispatches once itself afterward.
+    if ($field.length && !(opts && opts.noDispatch)) {
+      this._dispatchTableFieldChange($field.data('field-name'));
+    }
     return 'committed';
   };
 
@@ -1955,6 +1964,7 @@ define([], function () {
     const valChanged = !this._valuesEqual(current, cleared);
     if (valChanged) {
       this._editorValues[fieldName] = cleared;
+      this._snapshotCache = null;
       this._editorDirty = true;
     }
 
@@ -2041,7 +2051,6 @@ define([], function () {
       const $opt = self.$(this);
       const isSel = String($opt.data('val')) === val;
       $opt.toggleClass('selected', isSel);
-      $opt.find('.nsd-tag-option-check').html(isSel ? '&#x2713;' : '&nbsp;');
       if (isSel) display = $opt.data('label') || $opt.text().trim();
     });
     $wrapper.find('.nsd-select-label').text(display || '');
@@ -2074,7 +2083,6 @@ define([], function () {
       optTextByVal[optVal] = $opt.data('label') || $opt.text().trim();
       const isSel = vals.indexOf(optVal) !== -1;
       $opt.toggleClass('selected', isSel);
-      $opt.find('.nsd-tag-option-check').html(isSel ? '&#x2713;' : '&nbsp;');
     });
     vals.forEach(function (val) {
       const raw = String(val);
@@ -2082,7 +2090,7 @@ define([], function () {
       // render as raw-text chips.
       const optText = optTextByVal[raw] !== undefined ? optTextByVal[raw] : raw;
       const $chip = self.$(
-        `<span class="nsd-tag-chip" data-val="${escapeHtml(raw)}"><span class="nsd-tag-chip-text">${escapeHtml(optText)}</span><span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span></span>`
+        `<span class="nsd-tag-chip" data-val="${escapeHtml(raw)}"><span class="nsd-tag-chip-text">${escapeHtml(optText)}</span><span class="nsd-tag-chip-remove" role="button" tabindex="0" title="Remove" aria-label="Remove">${CLOSE_ICO_SVG}</span></span>`
       );
       $input.find('.nsd-tag-placeholder').before($chip);
     });
@@ -2095,16 +2103,23 @@ define([], function () {
    * so every consumer sees the state as-of-now (e.g. a just-picked machineId).
    */
   EntryDialog.prototype._editorSnapshot = function () {
-    const base = this._currentData || {};
-    const snapshot = this.$.extend({}, base);
-    Object.keys(this._editorValues || {}).forEach(function (key) {
-      const v = this._editorValues[key];
-      if (Array.isArray(v)) snapshot[key] = v.slice();
-      else if (v instanceof Date) snapshot[key] = new Date(v.getTime());
-      else if (v && typeof v === 'object') snapshot[key] = this.$.extend({}, v);
-      else snapshot[key] = v;
-    }, this);
-    return snapshot;
+    // Cache the composed snapshot until an in-editor value changes; each caller
+    // receives its own shallow top-level copy (distinct object, shared nested
+    // references). Nested refs stay valid because the editor reassigns
+    // arrays/dates on change rather than mutating them in place.
+    if (this._snapshotCache == null) {
+      const base = this._currentData || {};
+      const snapshot = this.$.extend({}, base);
+      Object.keys(this._editorValues || {}).forEach(function (key) {
+        const v = this._editorValues[key];
+        if (Array.isArray(v)) snapshot[key] = v.slice();
+        else if (v instanceof Date) snapshot[key] = new Date(v.getTime());
+        else if (v && typeof v === 'object') snapshot[key] = this.$.extend({}, v);
+        else snapshot[key] = v;
+      }, this);
+      this._snapshotCache = snapshot;
+    }
+    return this.$.extend({}, this._snapshotCache);
   };
 
   EntryDialog.prototype.getValue = function (fieldName) {
@@ -2230,6 +2245,7 @@ define([], function () {
           return c && c.name === fieldName;
         });
         if (col) {
+          this._rerenderTableField(tbl);
           this._refreshFieldUi();
           return this;
         }
@@ -2237,6 +2253,52 @@ define([], function () {
     }
     this._refreshFieldUi();
     return this;
+  };
+
+  /**
+   * Re-render a table field's rows so their options re-resolve against the
+   * live snapshot. A still-active row is auto-committed first (like OK / row
+   * switch) so its edits are not lost; if it is invalid the row stays active.
+   */
+  EntryDialog.prototype._rerenderTableField = function (field) {
+    if (!this._$editor || !field) return;
+    const self = this;
+    const $field = this._$editor
+      .find('.nsd-table-field')
+      .filter(function () {
+        return this.getAttribute('data-field-name') === String(field.name);
+      })
+      .first();
+    if (!$field || !$field.length) return;
+    const $active = $field.find('.nsd-table-rows .nsd-table-row.active').first();
+    if ($active.length) {
+      const read = this._readTableRowInputs($active, Array.isArray(field.columns) ? field.columns : []);
+      if (!read.anyValue) {
+        $active.remove();
+      } else if (this._commitTableRow($active, { noDispatch: true }) === 'invalid') {
+        return; // keep the invalid row active for the user to fix
+      }
+    }
+    const cols = Array.isArray(field.columns) ? field.columns : [];
+    const rows = [];
+    $field.find('.nsd-table-rows .nsd-table-row-value').each(function () {
+      let entry = {};
+      try {
+        entry = JSON.parse(self.$(this).val() || '{}');
+      } catch (e) {
+        entry = {};
+      }
+      rows.push(entry);
+    });
+    let rowsHtml = '';
+    rows.forEach(function (entry) {
+      rowsHtml += self._buildTableRowHtml(cols, entry || {}, field, false);
+    });
+    $field.find('.nsd-table-rows').html(rowsHtml);
+    $field.find('.nsd-field-invalid').removeClass('nsd-field-invalid');
+    // Single dispatch for the whole reload so dependents/summary/onChange see
+    // the latest rows; a no-op when the committed rows did not change.
+    this._dispatchTableFieldChange(field.name);
   };
 
   /**
@@ -2378,6 +2440,7 @@ define([], function () {
     }
 
     this._editorValues[fieldName] = normalized;
+    this._snapshotCache = null;
     this._editorDirty = true;
 
     const visited = this._fieldChangeVisited || (this._fieldChangeVisited = new Set());
@@ -2624,9 +2687,7 @@ define([], function () {
       if (!fieldName) return; // skip table-cell inputs (have no data-field-name)
       let val = self.$(this).val();
 
-      if (fieldName === 'quantity') {
-        updatedData.quantity = parseFloat(val) || 1;
-      } else if (self.$(this).data('field-type') === 'date' || self.$(this).data('field-type') === 'datetime') {
+      if (self.$(this).data('field-type') === 'date' || self.$(this).data('field-type') === 'datetime') {
         // Date fields: parse the input string back into a Date (empty -> null)
         updatedData[fieldName] = val ? parseZoneDate(val) : null;
       } else if (self.$(this).data('field-type') === 'time') {
@@ -2804,17 +2865,6 @@ define([], function () {
   };
 
   /**
-   * Resolve a time field's 12h flag: field.use12HourFormat (bool or fn) else
-   * the chart option use12HourFormat. fn receives the field-ish descriptor.
-   */
-  EntryDialog.prototype._is12HourFormat = function (field) {
-    if (field && field.use12HourFormat != null) {
-      return typeof field.use12HourFormat === 'function' ? !!field.use12HourFormat(field) : !!field.use12HourFormat;
-    }
-    return !!(this.options && this.options.use12HourFormat);
-  };
-
-  /**
    * Parse a time input to minutes since midnight (0-1439) or null. Accepts a
    * number/string of decimal HOURS (12.5 -> 750; 0.5 -> 30) or a time string
    * (12:30, 0:30, 1:05 pm / 1:05pm / 1:05 PM; am/pm optional, case-insensitive,
@@ -2853,7 +2903,7 @@ define([], function () {
 
   /**
    * Normalize a time value to its canonical 24-hour zero-padded HH:MM string
-   * ('' for empty/invalid). Independent of use12HourFormat.
+   * ('' for empty/invalid). Independent of the field's format option.
    */
   EntryDialog.prototype._parseTime = function (value, field) {
     if (value === '' || value == null) return '';
@@ -2865,27 +2915,26 @@ define([], function () {
   };
 
   /**
-   * Format a time value for display per use12HourFormat: HH:MM (24h, padded)
-   * or HH:MM am/pm (12h, padded, lowercase, space). '' for invalid.
+   * Format a time value for display from the field's `format` token string
+   * (e.g. 'hh:mm' 24h or 'hh:mm a' 12h). Falls back to hh:mm a (12h) when no
+   * format is declared. '' for invalid.
    */
   EntryDialog.prototype._formatTime = function (value, field) {
     const mins = this._timeToMinutes(value);
     if (mins == null) return '';
     const h = Math.floor(mins / 60);
     const m = mins % 60;
-    const mm = m < 10 ? `0${m}` : `${m}`;
-    if (!this._is12HourFormat(field)) {
-      return `${h < 10 ? '0' : ''}${h}:${mm}`;
+    const format = field && field.format;
+    if (format && typeof format === 'string') {
+      return this._renderDateTime(new Date(2000, 0, 1, h, m, 0, 0), format);
     }
-    const h12 = h % 12 || 12;
-    const period = h >= 12 ? 'pm' : 'am';
-    return `${h12 < 10 ? '0' : ''}${h12}:${mm} ${period}`;
+    return this._renderDateTime(new Date(2000, 0, 1, h, m, 0, 0), 'hh:mm a');
   };
 
   /**
    * Resolve the field descriptor a time input belongs to: top-level by
    * data-field-name, otherwise the table column by data-col-key. Returns an
-   * object (possibly empty) so _is12HourFormat always has a carrier.
+   * object (possibly empty) so _formatTime always has a format carrier.
    */
   EntryDialog.prototype._timeFieldFromInput = function ($inp) {
     const name = $inp.data('field-name');
@@ -2902,43 +2951,57 @@ define([], function () {
     return {};
   };
 
-  EntryDialog.prototype.formatDate = function (date, opts) {
+  /**
+   * Render a Date into a display string from a case-sensitive token format:
+   * date tokens YYYY / YY / MM / DD / MMM (uppercase) and time tokens hh / mm /
+   * a (lowercase). A standalone `a` switches hh to a 12-hour clock and appends
+   * lowercase am/pm; without it hh renders 24-hour. Tokens match as whole words
+   * (longest token first); every other character passes through literally.
+   * Returns '' for a non-string format or an invalid Date.
+   */
+  EntryDialog.prototype._renderDateTime = function (date, format) {
+    if (!(format && typeof format === 'string')) return '';
     const d = new Date(date);
-    const showYear = opts && opts.showYear;
-    const showTime = opts && opts.showTime;
-    const parts = { month: 'short', day: 'numeric' };
-    if (showYear) parts.year = 'numeric';
-    let result = d.toLocaleDateString(undefined, parts);
-    if (showTime) {
-      result += ` ${this.formatHourLabel(d.getHours(), d.getMinutes())}`;
+    if (isNaN(d.getTime())) return '';
+    const hours = d.getHours();
+    const is12 = /(^|[^a-z])a([^a-z]|$)/.test(format);
+    return format.replace(/YYYY|YY|MMM|MM|DD|hh|mm|a/g, function (tok) {
+      switch (tok) {
+        case 'YYYY':
+          return String(d.getFullYear());
+        case 'YY':
+          return String(d.getFullYear() % 100).padStart(2, '0');
+        case 'MM':
+          return String(d.getMonth() + 1);
+        case 'DD':
+          return String(d.getDate());
+        case 'MMM':
+          return d.toLocaleDateString(undefined, { month: 'short' });
+        case 'hh':
+          return is12 ? String(hours % 12 || 12) : String(hours).padStart(2, '0');
+        case 'mm':
+          return String(d.getMinutes()).padStart(2, '0');
+        case 'a':
+          return is12 ? (hours < 12 ? 'am' : 'pm') : 'am';
+        default:
+          return tok;
+      }
+    });
+  };
+
+  EntryDialog.prototype.formatDate = function (date, format, opts) {
+    // A declared `format` token string wins; otherwise the default is
+    // MM/DD/YYYY (date) or MM/DD/YYYY hh:mm a (datetime) when showTime is set.
+    if (format && typeof format === 'string') {
+      return this._renderDateTime(date, format);
     }
-    return result;
+    return this._renderDateTime(date, opts && opts.showTime ? 'MM/DD/YYYY hh:mm a' : 'MM/DD/YYYY');
   };
 
   /**
    * Wall-clock ISO 'YYYY-MM-DDTHH:MM:SS' (no timezone suffix) for a date, in
    * whatever zone the runtime local fields carry. Task dates are plain wall-clock,
    * so this is the representation payloads should use to round-trip cleanly.
-   */
-  EntryDialog.prototype.formatHourLabel = function (hour, minute) {
-    // Fractional shift hours (e.g. 13.5) become hour + minutes
-    let h = Math.floor(hour);
-    let m = Math.round((hour - h) * 60) + (minute || 0);
-    if (m >= 60) {
-      h += 1;
-      m -= 60;
-    }
-    if (this.options.use12HourFormat) {
-      const period = h >= 12 ? 'PM' : 'AM';
-      const h12 = h % 12 || 12;
-      return `${h12}:${m < 10 ? '0' : ''}${m} ${period}`;
-    }
-    return `${h}:${m < 10 ? '0' : ''}${m}`;
-  };
-
-  /**
-   * Format a dependency lag (minutes) for display: whole hours when the value
-   * divides evenly, otherwise minutes (e.g. 240 -> "4h", 90 -> "90m").
    */
   EntryDialog.prototype._toDatetimeLocal = function (date) {
     const d = new Date(date);

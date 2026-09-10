@@ -63,6 +63,10 @@
 		      'WC-2': [{ id: 'M-3', text: 'Machine 3' }],
 		      'WC-3': [{ id: 'M-4', text: 'Machine 4' }, { id: 'M-5', text: 'Machine 5' }, { id: 'M-6', text: 'Machine 6' }]
 	      };
+	      const locsByRoute = {
+		      'A': [{ id: 'A1', text: 'A-1 Dock' }, { id: 'A2', text: 'A-2 Yard' }],
+		      'B': [{ id: 'B1', text: 'B-1 Dock' }, { id: 'B2', text: 'B-2 Yard' }, { id: 'B3', text: 'B-3 Depot' }]
+	      };
 
 	      const formLayout = {
 		      columns: 3,
@@ -78,9 +82,9 @@
 			      { name: 'unitCost', label: 'Unit Cost', type: 'currency', decimalPlaces: 2, colspan: 1,
 				      validate: (value, ctx) => value == null || value === '' || Number(value) <= 200 },
 
-			      { name: 'startTime', label: 'Start Time', type: 'time', use12HourFormat: true, colspan: 1, break: true },
-			      { name: 'dueDate', label: 'Due Date', type: 'date', colspan: 1 },
-			      { name: 'endAt', label: 'End At', type: 'datetime', colspan: 1 },
+			      { name: 'startTime', label: 'Start Time', type: 'time', format: 'hh:mm a', colspan: 1, break: true },
+			      { name: 'dueDate', label: 'Due Date', type: 'date', format: 'MM/DD/YYYY', colspan: 1 },
+			      { name: 'endAt', label: 'End At', type: 'datetime', format: 'MM-DD-YYYY hh:mm', colspan: 1 },
 
 			      { name: 'locked', label: 'Locked', type: 'checkbox', checkboxLabel: 'Mark locked', colspan: 1, defaultValue: true },
 			      { name: 'secretNote', label: 'Shown when locked', type: 'text', colspan: 2,
@@ -115,6 +119,20 @@
 				      onChange: (ctx) => ctx.setValue('machineId', '') || ctx.reloadOptions('machineId') },
 			      { name: 'machineId', label: 'Machine', type: 'select', colspan: 2,
 				      options: (ctx) => (machinesForWorkCenter[ctx.getValue('workCenter')] || []) },
+
+			      { name: 'route', label: 'Route (reloads table column)', type: 'select', colspan: 2, break: true,
+				      options: [
+					      { id: 'A', text: 'Route A' },
+					      { id: 'B', text: 'Route B' }
+				      ],
+				      onChange: (ctx) => ctx.reloadOptions('loc') },
+			      { name: 'lots', label: 'Loads (route-dependent column)', type: 'table', colspan: 3, break: true, allowAdd: true,
+				      columns: [
+					      { name: 'loc', label: 'Location', type: 'select', width: 160, required: true,
+						      options: (ctx) => locsByRoute[ctx.getValue('route')] || [] },
+					      { name: 'qty', label: 'Qty', type: 'integer', width: 80, defaultValue: 1 }
+				      ],
+				      rowInit: () => ({ qty: 1 }) },
 
 			      { name: 'deps', label: 'Dependencies (task column + read-only cells)', type: 'table', colspan: 3, break: true, allowAdd: true,
 				      columns: [
@@ -160,6 +178,8 @@
           licenses: ['L1', 'L3'],
 		      workCenter: 'WC-1',
 		      machineId: 'M-1',
+		      route: 'A',
+		      lots: [],
 		      deps: [
 			      { id: 'OP-90', type: 'FS', qty: 2, cost: 10, due: '2026-08-10', start: '08:00', note: 'initial row' }
 		      ],
