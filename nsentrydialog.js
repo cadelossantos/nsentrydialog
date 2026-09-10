@@ -105,6 +105,27 @@ define([], function () {
     return o;
   }
 
+  // Inline SVG close (X) icon, shared by the editor title-bar close button and
+  // the tag-chip remove affordance. Same 30x30 glyph as nsprogressdialog;
+  // fill="currentColor" lets each host element's color/opacity drive it. Sized
+  // entirely via CSS (the .nsd-close-ico rules), so it carries no width/height.
+  const CLOSE_ICO_SVG = `<svg class="nsd-close-ico" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M 7 4 C 6.744125 4 6.4879687 4.0974687 6.2929688 4.2929688 L 4.2929688 6.2929688 C 3.9019687 6.6839688 3.9019687 7.3170313 4.2929688 7.7070312 L 11.585938 15 L 4.2929688 22.292969 C 3.9019687 22.683969 3.9019687 23.317031 4.2929688 23.707031 L 6.2929688 25.707031 C 6.6839688 26.098031 7.3170313 26.098031 7.7070312 25.707031 L 15 18.414062 L 22.292969 25.707031 C 22.682969 26.098031 23.317031 26.098031 23.707031 25.707031 L 25.707031 23.707031 C 26.098031 23.316031 26.098031 22.682969 25.707031 22.292969 L 18.414062 15 L 25.707031 7.7070312 C 26.098031 7.3170312 26.098031 6.6829688 25.707031 6.2929688 L 23.707031 4.2929688 C 23.316031 3.9019687 22.682969 3.9019687 22.292969 4.2929688 L 15 11.585938 L 7.7070312 4.2929688 C 7.5115312 4.0974687 7.255875 4 7 4 z"></path></svg>`;
+
+  // Cached source node for _closeIcon(); callers always receive a clone, so the
+  // cache stays valid across editor teardown/reopen.
+  let _closeSvg = null;
+
+  function _buildCloseSvg() {
+    const wrap = document.createElement('span');
+    wrap.innerHTML = CLOSE_ICO_SVG;
+    return wrap.children[0];
+  }
+
+  function _closeIcon() {
+    if (!_closeSvg) _closeSvg = _buildCloseSvg();
+    return _closeSvg.cloneNode(true);
+  }
+
   const ENTRY_DIALOG_CSS = `
     :root {
       --warn-red: #b91c1c;
@@ -129,10 +150,12 @@ define([], function () {
     .nsd-btn-secondary:hover { background: #f5f5f5; }
     .nsd-editor { position: fixed; z-index: 2000; background: white; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.15); padding: 12px; min-width: 250px; font-family: var(--sans); max-height: calc(90vh - 40px); display: flex; flex-direction: column; }
     .nsd-modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.35); z-index: 1999; }
-    .nsd-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; margin: -12px -12px 12px; background: var(--theme); border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; font-size: 12px; font-weight: 600; color: var(--text-h); cursor: move; user-select: none; }
-    .nsd-editor-title { color: white; font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .nsd-editor-close { background: transparent; border: none; color: white; font-size: 14px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
-    .nsd-editor-close:hover { background: var(--code-bg); color: var(--text); }
+    .nsd-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; margin: -12px -12px 12px; background: var(--theme); border-bottom: 1px solid var(--border-light); border-radius: 6px 6px 0 0; font-size: 12px; font-weight: 600; color: var(--text-h); cursor: move; user-select: none; }
+    .nsd-editor-controls { display: flex; gap: 6px; flex: none; }
+    .nsd-editor-title { font-size: 12px; font-weight: 600; color: white; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nsd-editor-close { width: 24px; height: 24px; padding: 2px 2px; border-radius: 0; border: 1px solid transparent; background: transparent; color: white; font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; }
+    .nsd-editor-close:hover { background: var(--code-bg); border-color: var(--border); color: var(--text-h); }
+    .nsd-editor-close .nsd-close-ico { width: 12px; height: 12px; display: block; }
     .nsd-editor-label { display: block; font-size: 12px; color: var(--accent); margin-bottom: 2px; text-transform: uppercase; }
     .nsd-number-field { text-align: right; }
     .nsd-editor-field:not(textarea) { height: 32px; box-sizing: border-box; }
@@ -154,6 +177,7 @@ define([], function () {
     .nsd-tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: var(--accent-bg); border-radius: 3px; font-size: 11px; color: var(--accent-dark); font-weight: 600; }
     .nsd-tag-chip-remove { cursor: pointer; font-size: 12px; line-height: 1; opacity: 0.6; margin-left: 2px; }
     .nsd-tag-chip-remove:hover { opacity: 1; }
+    .nsd-tag-chip-remove .nsd-close-ico { width: 10px; height: 10px; display: block; }
     .nsd-tag-placeholder { color: #999; font-size: 12px; padding: 2px 4px; }
     .nsd-tag-dropdown { position: absolute; z-index: 1000; background: white; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); max-height: 200px; overflow-y: auto; min-width: 200px; left: 0; right: 0; }
     .nsd-tag-option { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; font-size: 12px; color: var(--text-h); }
@@ -270,8 +294,11 @@ define([], function () {
 
     const self = this;
     this._$editor = this.$(
-      `<div class="nsd-editor" id="${this.id}-editor" style="display:none;">\t\t<div class="nsd-editor-header"><span class="nsd-editor-title"></span><button type="button" class="nsd-editor-close" title="Close" aria-label="Close">&#x2715;</button></div>\t\t<div class="nsd-editor-fields"></div>\t\t<div class="nsd-editor-actions"></div>\t</div>`
+      `<div class="nsd-editor" id="${this.id}-editor" style="display:none;">\t\t<div class="nsd-editor-header"><span class="nsd-editor-title"></span><div class="nsd-editor-controls"><button type="button" class="nsd-editor-close" title="Close" aria-label="Close"></button></div></div>\t\t<div class="nsd-editor-fields"></div>\t\t<div class="nsd-editor-actions"></div>\t</div>`
     ).appendTo(this.$el);
+
+    // Icon-only close button; title/aria-label carry the accessible name.
+    this._$editor.find('.nsd-editor-close').append(_closeIcon());
 
     // Modal backdrop below the editor, above the chart (z-index 1999/2000)
     this._$backdrop = this.$(
@@ -892,7 +919,7 @@ define([], function () {
             if (valArr.indexOf(normalized.val) !== -1) {
               fieldHtml += `
                 <span class="nsd-tag-chip" data-val="${escapeHtml(normalized.val)}">
-                  ${escapeHtml(normalized.text)}<span class="nsd-tag-chip-remove">&#x2715;</span>
+                  ${escapeHtml(normalized.text)}<span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span>
                 </span>`;
             }
           }
@@ -1739,7 +1766,9 @@ define([], function () {
 
       // Click input → toggle dropdown
       $input.on('click', function (e) {
-        if (self.$(e.target).hasClass('nsd-tag-chip-remove')) return;
+        // The remove affordance now holds an SVG, so e.target is that child,
+        // not the span itself: match the ancestor instead of the target class.
+        if (self.$(e.target).closest('.nsd-tag-chip-remove').length) return;
         $dropdown.toggle();
         if ($dropdown.is(':visible')) {
           $input.focus();
@@ -2050,7 +2079,7 @@ define([], function () {
       // render as raw-text chips.
       const optText = optTextByVal[raw] !== undefined ? optTextByVal[raw] : raw;
       const $chip = self.$(
-        `<span class="nsd-tag-chip" data-val="${escapeHtml(raw)}">${escapeHtml(optText)}<span class="nsd-tag-chip-remove">&#x2715;</span></span>`
+        `<span class="nsd-tag-chip" data-val="${escapeHtml(raw)}">${escapeHtml(optText)}<span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span></span>`
       );
       $input.find('.nsd-tag-placeholder').before($chip);
     });
