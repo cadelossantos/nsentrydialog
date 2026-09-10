@@ -11,15 +11,10 @@ define([], function () {
   // `create(formLayout, data, callbacks)` returning the full merged object.
 
   const MODULE_NAME = 'nsentrydialog';
-
   const STYLE_ID = 'nsentrydialog-plugin-styles';
-
   const EDITOR_COLUMN_WIDTH = 350;
-
   const DEFAULT_GRID_COLUMNS = 1; // used when formLayout.columns is omitted
-
   const TABLE_COLUMN_MIN_WIDTH = 120; // floor for width-less table columns so they never crush
-
   let instanceCounter = 0;
 
   // Vertical scrollbar width of the current environment (cached after first
@@ -111,6 +106,12 @@ define([], function () {
   // entirely via CSS (the .nsd-close-ico rules), so it carries no width/height.
   const CLOSE_ICO_SVG = `<svg class="nsd-close-ico" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M 7 4 C 6.744125 4 6.4879687 4.0974687 6.2929688 4.2929688 L 4.2929688 6.2929688 C 3.9019687 6.6839688 3.9019687 7.3170313 4.2929688 7.7070312 L 11.585938 15 L 4.2929688 22.292969 C 3.9019687 22.683969 3.9019687 23.317031 4.2929688 23.707031 L 6.2929688 25.707031 C 6.6839688 26.098031 7.3170313 26.098031 7.7070312 25.707031 L 15 18.414062 L 22.292969 25.707031 C 22.682969 26.098031 23.317031 26.098031 23.707031 25.707031 L 25.707031 23.707031 C 26.098031 23.316031 26.098031 22.682969 25.707031 22.292969 L 18.414062 15 L 25.707031 7.7070312 C 26.098031 7.3170312 26.098031 6.6829688 25.707031 6.2929688 L 23.707031 4.2929688 C 23.316031 3.9019687 22.682969 3.9019687 22.292969 4.2929688 L 15 11.585938 L 7.7070312 4.2929688 C 7.5115312 4.0974687 7.255875 4 7 4 z"></path></svg>`;
 
+  // Read-only checkbox glyphs (carbon checked--filled box, interface unchecked
+  // outline). fill/stroke use currentColor so each host element's color drives
+  // them; sized entirely via CSS (.nsd-readonly-check rules).
+  const CHK_ICO_SVG = `<svg class="nsd-readonly-check" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M26,4H6A2,2,0,0,0,4,6V26a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V6A2,2,0,0,0,26,4ZM14,21.5,9,16.5427,10.5908,15,14,18.3456,21.4087,11l1.5918,1.5772Z"/></svg>`;
+  const UNCHK_ICO_SVG = `<svg class="nsd-readonly-check" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 7.2V16.8C4 17.92 4 18.48 4.218 18.908C4.41 19.284 4.715 19.59 5.092 19.782C5.519 20 6.079 20 7.197 20H16.803C17.921 20 18.48 20 18.907 19.782C19.284 19.59 19.59 19.284 19.782 18.908C20 18.481 20 17.922 20 16.804V7.197C20 6.079 20 5.519 19.782 5.092C19.59 4.715 19.284 4.41 18.907 4.218C18.48 4 17.92 4 16.8 4H7.2C6.08 4 5.52 4 5.092 4.218C4.715 4.41 4.41 4.715 4.218 5.092C4 5.52 4 6.08 4 7.2Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
   // Cached source node for _closeIcon(); callers always receive a clone, so the
   // cache stays valid across editor teardown/reopen.
   let _closeSvg = null;
@@ -163,7 +164,10 @@ define([], function () {
     .nsd-editor-row-break { flex-basis: 100%; width: 0; height: 0; }
     .nsd-checkbox { display: flex; align-items: center; gap: 6px; font-size: 9pt; }
     .nsd-checkbox-group { display: flex; flex-direction: column; margin: 2px 0; font-size: 9pt; }
-    .nsd-cg-item { flex: 1 1 100%; }
+    .nsd-cg-item { flex: 1 1 100%; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-h); }
+    .nsd-field-readonly.nsd-cg-item { gap: 6px; }
+    .nsd-readonly-check { width: 14px; height: 14px; display: inline-block; vertical-align: middle; flex: none; }
+    .nsd-cg-item .nsd-readonly-check { width: 14px; height: 14px; }
     .nsd-checkbox-input { margin: 2px 0; }
     .nsd-table-row.active .nsd-table-cell:has(.nsd-table-checkbox) { padding: 0; display: flex; align-items: center; justify-content: center; }
     .nsd-table-checkbox { height: 35px; margin: 2px 0; }
@@ -174,8 +178,10 @@ define([], function () {
     .nsd-field-readonly { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; width: 100%; min-height: 32px; box-sizing: border-box; padding-left: 0; }
     .nsd-tag-input { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; box-sizing: border-box; background: white; align-items: center; min-height: 32px; }
     .nsd-tag-input:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
-    .nsd-tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: var(--accent-bg); border-radius: 3px; font-size: 11px; color: var(--accent-dark); font-weight: 600; }
+    .nsd-tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: var(--accent-bg); border-radius: 3px; font-size: 11px; color: var(--accent-dark); font-weight: 600; white-space: nowrap; }
+    .nsd-tag-chip-text { position: relative; top: -1px; }
     .nsd-tag-chip-remove { cursor: pointer; font-size: 12px; line-height: 1; opacity: 0.6; margin-left: 2px; }
+    .nsd-tag-chip .nsd-tag-chip-remove { align-self: center; }
     .nsd-tag-chip-remove:hover { opacity: 1; }
     .nsd-tag-chip-remove .nsd-close-ico { width: 10px; height: 10px; display: block; }
     .nsd-tag-placeholder { color: #999; font-size: 12px; padding: 2px 4px; }
@@ -902,7 +908,7 @@ define([], function () {
           for (let mi = 0; mi < mOpts.length; mi++) {
             const normalized = this._normalizeOption(mOpts[mi]);
             if (valArr.indexOf(normalized.val) !== -1) {
-              fieldHtml += `<span class="nsd-tag-chip" data-val="${escapeHtml(normalized.val)}">${escapeHtml(normalized.text)}</span>`;
+              fieldHtml += `<span class="nsd-tag-chip" data-val="${escapeHtml(normalized.val)}"><span class="nsd-tag-chip-text">${escapeHtml(normalized.text)}</span></span>`;
               chipCount++;
             }
           }
@@ -917,10 +923,7 @@ define([], function () {
           for (let mi = 0; mi < mOpts.length; mi++) {
             const normalized = this._normalizeOption(mOpts[mi]);
             if (valArr.indexOf(normalized.val) !== -1) {
-              fieldHtml += `
-                <span class="nsd-tag-chip" data-val="${escapeHtml(normalized.val)}">
-                  ${escapeHtml(normalized.text)}<span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span>
-                </span>`;
+              fieldHtml += `<span class="nsd-tag-chip" data-val="${escapeHtml(normalized.val)}"><span class="nsd-tag-chip-text">${escapeHtml(normalized.text)}</span><span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span></span>`;
             }
           }
           fieldHtml += `
@@ -980,7 +983,7 @@ define([], function () {
         const checked = value === true || value === 1 || value === '1' || value === 'true' || value === 'T';
         if (isReadonly) {
           // Read-only checkbox: static check glyph
-          fieldHtml += `<span class="nsd-field-readonly nsd-select-label" data-field-name="${escapeHtml(fieldName)}">${checked ? '&#x2611;' : '&#x2610;'}</span>`;
+          fieldHtml += `<span class="nsd-field-readonly nsd-cg-item" data-field-name="${escapeHtml(fieldName)}">${checked ? CHK_ICO_SVG : UNCHK_ICO_SVG}${escapeHtml(field.checkboxLabel || '')}</span>`;
         } else {
           fieldHtml += `<label class="nsd-checkbox"><input type="checkbox" class="nsd-checkbox-input" data-field-name="${escapeHtml(fieldName)}"${checked ? ' checked' : ''}> <span>${escapeHtml(field.checkboxLabel || '')}</span></label>`;
         }
@@ -998,7 +1001,7 @@ define([], function () {
             const oVal = String(typeof opt === 'string' ? opt : opt.id || opt.value);
             const oText = typeof opt === 'string' ? opt : opt.name || opt.text || opt.id || opt.value;
             const isSel = selArr.indexOf(oVal) !== -1;
-            fieldHtml += `<span class="nsd-cg-item">${isSel ? '&#x2611;' : '&#x2610;'} ${escapeHtml(oText)}</span>`;
+            fieldHtml += `<span class="nsd-cg-item">${isSel ? CHK_ICO_SVG : UNCHK_ICO_SVG}${escapeHtml(oText)}</span>`;
             if (isSel) marked++;
           }
           if (marked === 0) fieldHtml += '&nbsp;';
@@ -2079,7 +2082,7 @@ define([], function () {
       // render as raw-text chips.
       const optText = optTextByVal[raw] !== undefined ? optTextByVal[raw] : raw;
       const $chip = self.$(
-        `<span class="nsd-tag-chip" data-val="${escapeHtml(raw)}">${escapeHtml(optText)}<span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span></span>`
+        `<span class="nsd-tag-chip" data-val="${escapeHtml(raw)}"><span class="nsd-tag-chip-text">${escapeHtml(optText)}</span><span class="nsd-tag-chip-remove">${CLOSE_ICO_SVG}</span></span>`
       );
       $input.find('.nsd-tag-placeholder').before($chip);
     });
