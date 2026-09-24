@@ -13,6 +13,7 @@ define([], function () {
   const MODULE_NAME = 'nsentrydialog';
   const STYLE_ID = 'nsentrydialog-plugin-styles';
   const EDITOR_COLUMN_WIDTH = 350;
+  const FIELD_COLUMN_PADDING = 8; // .nsd-field-col horizontal padding (shared with the action bar alignment)
   const DEFAULT_GRID_COLUMNS = 1; // used when formLayout.columns is omitted
   const TABLE_COLUMN_MIN_WIDTH = 120; // floor for width-less table columns so they never crush
   let instanceCounter = 0;
@@ -741,11 +742,23 @@ define([], function () {
     // correct even under an ambient global box-sizing reset.
     const sb = measureScrollbarWidth();
     const numCols = formLayout.columns || DEFAULT_GRID_COLUMNS;
+    const gridWidth = numCols * EDITOR_COLUMN_WIDTH;
     fieldsContainer.css({
       boxSizing: 'border-box',
-      width: `${numCols * EDITOR_COLUMN_WIDTH + 3 * sb}px`,
+      width: `${gridWidth + 3 * sb}px`,
       paddingLeft: `${sb}px`,
       paddingRight: `${sb}px`,
+    });
+    // Mirror the grid's content box on the action bar so its right edge always
+    // lands on the right edge of a full-width field input (gridWidth + sb -
+    // FIELD_COLUMN_PADDING from the editor's left edge), whatever the column
+    // count or scrollbar state. The bar stays narrower than the fields
+    // container (2sb vs 3sb), so it never widens the editor.
+    $actions.css({
+      boxSizing: 'border-box',
+      width: `${gridWidth + 2 * sb}px`,
+      paddingLeft: `${sb}px`,
+      paddingRight: `${sb + FIELD_COLUMN_PADDING}px`,
     });
 
     // Render the declared fields, then wire tag inputs (function-options fields
@@ -849,7 +862,7 @@ define([], function () {
       let value = data[fieldName] != null ? data[fieldName] : defaultVal != null ? defaultVal : '';
       let colspan = Math.min(this._resolveProp(field.colspan, ctx) ?? (field.colspan || 1), numColumns);
       let breakBefore = this._resolveProp(field.break, ctx) === true;
-      let wrapperStyle = `width:${colspan * EDITOR_COLUMN_WIDTH}px;box-sizing:border-box;padding:0 8px;position:relative;min-width:0;flex-shrink:1;${visible ? '' : 'display:none;'}`;
+      let wrapperStyle = `width:${colspan * EDITOR_COLUMN_WIDTH}px;box-sizing:border-box;padding:0 ${FIELD_COLUMN_PADDING}px;position:relative;min-width:0;flex-shrink:1;${visible ? '' : 'display:none;'}`;
 
       // Force a new row in the flex-wrap container (clear:left does nothing on flex items)
       let fieldHtml = breakBefore ? '<div class="nsd-editor-row-break"></div>' : '';
