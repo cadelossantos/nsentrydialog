@@ -33,6 +33,7 @@
   <div class="btnrow">
     <button id="openBtn">Open (Edit)</button>
     <button id="viewBtn" class="secondary">Open (View — read-only)</button>
+    <button id="tableOnlyBtn" class="secondary">Open (Table only, minHeight)</button>
   </div>
   <div class="status" id="status">(not opened yet)</div>
 
@@ -221,8 +222,54 @@
         }
       }
 
+      // Single table field with minHeight: the dialog body is only the table, and the
+      // .nsd-table-scroll wrapper reserves the min height even with one row.
+      function openTableOnly() {
+	      const tableLayout = {
+		      columns: 2,
+		      title: 'Table only (minHeight 200)',
+		      fields: [
+			      { name: 'lines', label: 'Lines (minHeight: 200)', type: 'table', colspan: 2, allowAdd: true, minHeight: 200,
+				      columns: [
+					      { name: 'code', label: 'Code', type: 'text', width: 200, required: true },
+					      { name: 'qty', label: 'Qty', type: 'integer', width: 100, defaultValue: 1 }
+				      ],
+				      rowInit: () => ({ qty: 1 }) }
+		      ],
+		      buttons: [
+			      { label: 'OK (Save)', result: 1, primary: true },
+			      { label: 'Cancel' }
+		      ],
+	      };
+
+	      const tableData = {
+		      lines: [ { code: 'A-100', qty: 3 } ]
+	      };
+
+	      try {
+		      nsd.create(
+			      tableLayout,
+			      tableData,
+			      {
+				      success: function (result, valueObj) {
+					      if (result === null) logLine('[NO-SAVE CLOSE] result=' + result + ' valueObj =', valueObj);
+					      else logLine('[SAVE] result=' + result + ' valueObj =', valueObj);
+				      },
+				      failure: function (reason) {
+					      console.error('nsentrydialog failure:', reason);
+					      statusEl.textContent += '\nFAILURE: ' + String(reason && reason.message || reason);
+				      }
+			      }
+		      );
+	      } catch (e) {
+		      console.error(e);
+		      statusEl.textContent += '\nEXCEPTION: ' + String(e && e.message || e);
+	      }
+      }
+
       document.getElementById('openBtn').addEventListener('click', function () { open(false); });
       document.getElementById('viewBtn').addEventListener('click', function () { open(true); });
+      document.getElementById('tableOnlyBtn').addEventListener('click', function () { openTableOnly(); });
     });
   </script>
 </body>
