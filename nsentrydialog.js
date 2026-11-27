@@ -1043,8 +1043,9 @@ define([], function () {
         const tableWidthStyle = field.width != null ? `width:${Number(field.width)}px;` : 'width:100%;';
         const rowsArr = Array.isArray(value) ? value : [];
         let tableHtml = `<div class="nsd-table-field${isTableReadonly ? ' nsd-table-readonly' : ''}" data-field-name="${escapeHtml(fieldName)}" data-field-type="table" style="${tableWidthStyle}box-sizing:border-box;">`;
-        const scrollStyle =
-          field.maxHeight != null ? ` style="max-height:${Number(field.maxHeight)}px;overflow-y:auto;"` : '';
+        const scrollMinCss = field.minHeight != null ? `min-height:${Number(field.minHeight)}px;` : '';
+        const scrollMaxCss = field.maxHeight != null ? `max-height:${Number(field.maxHeight)}px;overflow-y:auto;` : '';
+        const scrollStyle = scrollMinCss || scrollMaxCss ? ` style="${scrollMinCss}${scrollMaxCss}"` : '';
         tableHtml += `<div class="nsd-table-scroll"${scrollStyle}>`;
         // Header (sticky within the scroll container)
         tableHtml += `

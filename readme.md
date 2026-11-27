@@ -93,6 +93,8 @@ or a **`(ctx) => value`** resolver.
 | `rowInit` | `(ctx) => object` | Table: seed a newly added row. |
 | `validateRow` | `(value, ctx) => boolean` | Table: whole live row; `false` => silent block. |
 | `columns` | `Field[]` | Table: nested column descriptors. |
+| `maxHeight` | `number` | Table only, px: caps the table body height; extra rows scroll inside. |
+| `minHeight` | `number` | Table only, px: reserves a minimum table body height. |
 
 > Table option dropdowns use `type: 'select'` with `options`; there is no
 > separate `task` column type.
