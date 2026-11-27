@@ -231,8 +231,8 @@
 		      fields: [
 			      { name: 'lines', label: 'Lines (minHeight: 200)', type: 'table', colspan: 2, allowAdd: true, minHeight: 200,
 				      columns: [
-					      { name: 'code', label: 'Code', type: 'text', width: 200, required: true },
-					      { name: 'qty', label: 'Qty', type: 'integer', width: 100, defaultValue: 1 }
+					      { name: 'code', label: 'Code', type: 'text', required: true },
+					      { name: 'qty', label: 'Qty', type: 'integer', defaultValue: 1 }
 				      ],
 				      rowInit: () => ({ qty: 1 }) }
 		      ],
