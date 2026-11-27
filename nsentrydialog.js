@@ -436,11 +436,14 @@ define([], function () {
           safeLog('error', `${MODULE_NAME}:rowInit`, (err && err.message) || err);
         }
       }
-      $field
-        .find('.nsd-table-rows')
-        .append(
-          self._buildTableRowHtml((layoutField && layoutField.columns) || [], initEntry, layoutField, true, nextIndex)
-        );
+      // A new row is uncommitted until OK / row switch: the rowInit seed values
+      // live only in its inputs, so Cancel discards the row instead of
+      // re-rendering it as a committed row holding just the seed
+      const $newRow = self.$(
+        self._buildTableRowHtml((layoutField && layoutField.columns) || [], initEntry, layoutField, true, nextIndex)
+      );
+      $newRow.find('.nsd-table-row-value').val('{}');
+      $field.find('.nsd-table-rows').append($newRow);
       self._editorDirty = true;
       self._$editor.find('.nsd-field-invalid').removeClass('nsd-field-invalid');
     });
@@ -1043,8 +1046,9 @@ define([], function () {
         const tableWidthStyle = field.width != null ? `width:${Number(field.width)}px;` : 'width:100%;';
         const rowsArr = Array.isArray(value) ? value : [];
         let tableHtml = `<div class="nsd-table-field${isTableReadonly ? ' nsd-table-readonly' : ''}" data-field-name="${escapeHtml(fieldName)}" data-field-type="table" style="${tableWidthStyle}box-sizing:border-box;">`;
-        const scrollStyle =
-          field.maxHeight != null ? ` style="max-height:${Number(field.maxHeight)}px;overflow-y:auto;"` : '';
+        const scrollMinCss = field.minHeight != null ? `min-height:${Number(field.minHeight)}px;` : '';
+        const scrollMaxCss = field.maxHeight != null ? `max-height:${Number(field.maxHeight)}px;overflow-y:auto;` : '';
+        const scrollStyle = scrollMinCss || scrollMaxCss ? ` style="${scrollMinCss}${scrollMaxCss}"` : '';
         tableHtml += `<div class="nsd-table-scroll"${scrollStyle}>`;
         // Header (sticky within the scroll container)
         tableHtml += `
